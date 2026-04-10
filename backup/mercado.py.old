@@ -1,0 +1,490 @@
+import os.path
+from app.database import db
+import random
+from datetime import datetime
+from calendar import monthrange
+import ssl
+import certifi
+import requests
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+
+# If modifying these scopes, delete the file token.json.
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+
+# The ID and range of a sample spreadsheet.
+SAMPLE_SPREADSHEET_ID = "1n-xboWVMKFzBb-fQZbsqgTkJBPCt3SQzySuRU03B8Ew"
+ESSENCIAIS = "Alimentos!A:F"
+ALIMENTOS = "Alimentos!A:F"
+CUIDADOS_PESSOAIS = "'Cuidados pessoais'!A:F"
+LIMPEZA_UTILIDADES = "'Limpeza & Utilidades'!A:F"
+PET = "Pet!A:F"
+
+CLIENT_SECRET_FILE = "G:\\Meu Drive\\Workspace\\aleatorio\\principal-tarefas-aleatorias\\credentials.json"
+
+
+def horario(argumento):
+    data_atual = datetime.now()
+    if argumento == "dia_do_mes":
+        return data_atual.day
+    elif argumento == "dia_da_semana":
+        return data_atual.weekday()
+    elif argumento == "dias_mes":
+        return monthrange(data_atual.year, data_atual.month)[1]
+    elif argumento == "hora":
+        return data_atual.hour
+
+
+def aleatorio(lista):
+    lista.sort()
+    random.shuffle(lista)
+    return random.choice(lista)
+
+
+def saldo_vale_alimentacao(saldo):
+    vale_alimentacao = 1502
+    dia_atual = horario("dia_do_mes")
+
+    saldo = float(saldo)
+
+    # Inicializar variáveis
+    restante_projetado = 0
+    saldo_final = 0
+
+    if dia_atual is not None:
+        restante_projetado = int(vale_alimentacao - (vale_alimentacao / 30) * dia_atual)
+        saldo_final = int(
+            saldo - (vale_alimentacao - (vale_alimentacao / 30) * dia_atual)
+        )
+
+    print(
+        "\n"
+        + "O valor restante projetado seria R$"
+        + str(restante_projetado)
+        + ". O saldo remanescente é de R$ "
+        + str(saldo_final)
+    )
+
+    return saldo_final
+
+
+def create_ssl_context():
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    return ssl_context
+
+
+def definirTipoCompra():
+    tipos_compra_todos = [
+        "Cashback",
+        "Essenciais",
+        "Lista de compras",
+        "Ofertas",
+        "Receitas",
+    ]
+    tipo_compra_sorteada = aleatorio(tipos_compra_todos)
+    return tipo_compra_sorteada
+
+
+def definirMercado(tipo_compra):
+    mercados = {
+        "AMAZON": ["Cashback", "Lista de compras"],
+        "COBASI": ["Lista de compras", "Ofertas"],
+        "COM-SCIÊNCIA": ["Lista de compras", "Essenciais", "Lanche"],
+        "DROGA RAIA": ["Lista de compras", "Ofertas"],
+        "MERCADO LIVRE": ["Cashback", "Lista de compras"],
+        "OBA HORTIFRÚTI": ["Lista de compras", "Ofertas"],
+        "DROGARIA SP": ["Lista de compras"],
+        "PÃO DE AÇÚCAR": ["Lista de compras"],
+        "PETLOVE": ["Lista de compras"],
+        "POPULAR PET": ["Lista de compras"],
+        "PIRATININGA": ["Lista de compras", "Ofertas", "Essenciais", "Receitas"],
+        "ROLDÃO": ["Ofertas"],
+        "SÍTIO VERDE": ["Lista de compras", "Ofertas", "Essenciais"],
+        "SONDA": ["Cashback", "Lista de compras", "Ofertas", "Essenciais"],
+        "TAUSTE": ["Cashback", "Lista de compras", "Ofertas", "Essenciais", "Receitas"],
+    }
+
+    mercados_viaveis = []
+
+    for mercado_selecionado in mercados.keys():
+        tipos_compra_mercado_selecionado = mercados[mercado_selecionado]
+        if tipo_compra in tipos_compra_mercado_selecionado:
+            mercados_viaveis.append(mercado_selecionado)
+
+    mercado_definido = aleatorio(mercados_viaveis)
+    return mercado_definido
+
+
+def acessarPlanilha(planilha, mercado, tipo_compra):
+    """Shows basic usage of the Sheets API.
+    Prints values from a sample spreadsheet.
+    """
+    # Configuração SSL mais robusta para resolver problemas de conexão
+    import urllib3
+    import httplib2
+    import socket
+
+    # Desabilitar warnings de SSL para conexões problemáticas
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    # Configurar timeout padrão do socket (em segundos)
+    socket.setdefaulttimeout(60)
+
+    # Configurar sessão HTTP com certificados e timeouts apropriados
+    session = requests.Session()
+    session.verify = certifi.where()
+
+    # Configurar timeouts e retries mais robustos
+    from urllib3.util.retry import Retry
+    from requests.adapters import HTTPAdapter
+
+    # Estratégia de retry mais agressiva para lidar com problemas de SSL
+    retry_strategy = Retry(
+        total=5,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "POST"],
+        raise_on_status=False,
+    )
+
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+
+    creds = None
+    # The file token.json stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                # Criar request com retry
+                request = Request(session=session)
+
+                # Tentar refresh com múltiplas tentativas
+                max_tentativas = 5
+                for tentativa in range(max_tentativas):
+                    try:
+                        print(
+                            f"🔄 Tentativa {tentativa + 1} de {max_tentativas} - Atualizando token..."
+                        )
+                        creds.refresh(request)
+                        print("✅ Token atualizado com sucesso!")
+                        break
+                    except Exception as e_inner:
+                        if tentativa < max_tentativas - 1:
+                            print(
+                                f"⚠️  Tentativa {tentativa + 1} falhou: {str(e_inner)[:100]}"
+                            )
+                            print("⏳ Aguardando antes de tentar novamente...")
+                            import time
+
+                            time.sleep(
+                                3
+                            )  # Aguardar 3 segundos antes de tentar novamente
+                        else:
+                            raise e_inner
+
+            except Exception as e:
+                print(f"\n❌ Erro ao atualizar token: {e}")
+                print(
+                    "\n⚠️  SOLUÇÃO: Delete o arquivo 'token.json' e execute o programa novamente."
+                )
+                print("Isso forçará uma nova autenticação com o Google.")
+                print("\nPara deletar, execute: del token.json")
+                return
+        else:
+            try:
+                print("\n🔐 Iniciando processo de autenticação...")
+                print("⚠️  Detectado problema de SSL - usando método alternativo")
+
+                # Método de autenticação manual (mais robusto para problemas de SSL)
+                try:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        CLIENT_SECRET_FILE, SCOPES
+                    )
+
+                    # Gerar URL de autenticação
+                    auth_url, _ = flow.authorization_url(prompt="consent")
+
+                    print("\n" + "=" * 60)
+                    print("🌐 AUTENTICAÇÃO MANUAL")
+                    print("=" * 60)
+                    print("\n1. Abra este link no seu navegador:")
+                    print(f"\n{auth_url}\n")
+                    print("2. Faça login com sua conta Google")
+                    print("3. Autorize o aplicativo")
+                    print("4. Você será redirecionado para uma página")
+                    print("   (pode mostrar erro 'Não foi possível acessar o site')")
+                    print("5. COPIE A URL COMPLETA da barra de endereços")
+                    print("   (deve começar com 'http://localhost')")
+                    print("\n" + "=" * 60)
+
+                    # Abrir navegador automaticamente
+                    import webbrowser
+
+                    webbrowser.open(auth_url)
+
+                    # Solicitar o código do usuário
+                    print("\n📋 Aguardando autorização...")
+                    redirect_response = input(
+                        "Cole aqui a URL completa que apareceu no navegador:\n> "
+                    ).strip()
+
+                    if not redirect_response:
+                        raise ValueError("URL não fornecida")
+
+                    # Extrair o código da resposta usando httplib2
+                    flow.fetch_token(authorization_response=redirect_response)
+                    creds = flow.credentials
+
+                    print("\n✅ Autenticação manual realizada com sucesso!")
+
+                except Exception as e_manual:
+                    print(f"\n❌ Erro na autenticação: {str(e_manual)[:150]}")
+                    raise e_manual
+
+            except Exception as e:
+                print(f"\n❌ Erro na autenticação: {e}")
+                print("\n🔧 SOLUÇÕES POSSÍVEIS:")
+                print("1. DELETE o arquivo 'token.json': del token.json")
+                print("2. Verifique sua conexão com a internet")
+                print("3. Tente usar uma rede diferente (dados móveis, outro WiFi)")
+                print("4. Desative temporariamente firewall/antivírus/VPN")
+                print("5. Verifique se o arquivo 'credentials.json' está correto")
+                print("6. Atualize as bibliotecas:")
+                print(
+                    "   pip install --upgrade certifi google-auth google-auth-oauthlib google-auth-httplib2"
+                )
+                print("7. Se estiver em rede corporativa/escola, pode haver bloqueio")
+                print("8. Execute no CMD como administrador")
+                print("9. Reinicie o computador")
+                print("\n💡 DICA IMPORTANTE:")
+                print("   Se o erro persistir, pode ser bloqueio de rede.")
+                print("   Tente conectar via dados móveis do celular (hotspot).")
+                return
+
+        # Save the credentials for the next run
+        try:
+            with open("token.json", "w") as token:
+                token.write(creds.to_json())
+            print("✅ Credenciais salvas com sucesso!")
+        except Exception as e:
+            print(f"⚠️  Aviso: Não foi possível salvar as credenciais: {e}")
+
+    categoria_lista = []
+    marca_lista = []
+    item_lista = []
+    qtde_lista = []
+    mercado_lista = []
+    menor_preco_lista = []
+
+    lista_mercado_categoria = {}
+    # lista_mercado_marca = []
+    # lista_mercado_item = []
+
+    try:
+        # Construir o serviço da API do Google Sheets
+        service = build("sheets", "v4", credentials=creds)
+
+        # Call the Sheets API
+        sheet = service.spreadsheets()
+        result = (
+            sheet.values()
+            .get(spreadsheetId=SAMPLE_SPREADSHEET_ID, range=planilha)
+            .execute()
+        )
+        values = result.get("values", [])
+
+        if not values:
+            print("No data found.")
+            return
+
+        for row in values:
+            # Print columns A and E, which correspond to indices 0 and 4.
+            # print(f"{row[0]}, {row[4]}")
+
+            categoria_set = {row[1]}
+            categoria_set = str(categoria_set)
+            categoria_set = categoria_set.strip("{'").strip("}'")
+            categoria_lista.append(categoria_set)
+
+            marca_set = {row[2]}
+            marca_set = str(marca_set)
+            marca_set = marca_set.strip("{'").strip("}'")
+            marca_lista.append(marca_set)
+
+            item_set = {row[0]}
+            item_set = str(item_set)
+            item_set = item_set.strip("{'").strip("}'")
+            item_lista.append(item_set)
+
+            qtde_set = {row[3]}
+            qtde_set = str(qtde_set)
+            qtde_set = qtde_set.strip("{'").strip("}'")
+            qtde_lista.append(qtde_set)
+
+            mercado_set = {row[4]}
+            mercado_set = str(mercado_set)
+            mercado_set = mercado_set.strip("{'").strip("}'")
+            mercado_lista.append(mercado_set)
+
+            menor_preco_set = {row[5]}
+            menor_preco_set = str(menor_preco_set)
+            menor_preco_set = menor_preco_set.strip("{'").strip("}'")
+            menor_preco_lista.append(menor_preco_set)
+
+            for indice, mercado_for in enumerate(mercado_lista):
+                if mercado_for == mercado:
+                    lista_mercado_categoria[indice] = categoria_lista[indice]
+
+        categorias = [
+            "Bebidas frias não-alcoólicas",
+            "Bebidas quentes e leites",
+            "Bebidas alcoólicas",
+            "Cereais",
+            "Cogumelos",
+            "Cremes e pastas",
+            "Cuidados pessoais",
+            "Doces e adoçantes",
+            "Frutas não-vermelhas",
+            "Frutas vermelhas",
+            "Infantil",
+            "Legumes",
+            "Leguminosas",
+            "Limpeza",
+            "Molhos e óleos",
+            "Oleaginosas",
+            "Pães e biscoitos",
+            "Pet",
+            "Prato pronto",
+            "Presentes",
+            "Roupas e Utilidades",
+            "Temperos",
+            "Vegetais crucíferos",
+            "Verduras não-crucíferas",
+        ]
+
+        for categoria in categorias:
+            try:
+                # print(f"lista_mercado_categoria: {lista_mercado_categoria}")
+                # print(f"categoria: {categoria}")
+                lista_categorias_filtrada = {
+                    chave: valor
+                    for chave, valor in lista_mercado_categoria.items()
+                    if valor == categoria
+                }
+                # print(f"lista_categorias_filtrada: {lista_categorias_filtrada}")
+
+                lista_parcial = {
+                    chave: menor_preco_lista[chave]
+                    for chave in lista_categorias_filtrada.keys()
+                }
+
+                if tipo_compra == "Essenciais":
+                    lista_valores = {
+                        chave: valor
+                        for chave, valor in lista_parcial.items()
+                        if float(valor.replace("R$", "").replace(",", ".")) <= 16
+                    }
+                else:
+                    lista_valores = lista_parcial
+
+                indice = aleatorio(list(lista_valores.keys()))
+
+                if marca_lista[indice] == "" or marca_lista[indice] == "-":
+                    print(
+                        categoria
+                        + ": "
+                        + item_lista[indice]
+                        + " | "
+                        + qtde_lista[indice]
+                        + " g/ml/unidade | "
+                        + menor_preco_lista[indice]
+                    )
+
+                else:
+                    print(
+                        categoria
+                        + ": "
+                        + marca_lista[indice]
+                        + " | "
+                        + item_lista[indice]
+                        + " | "
+                        + qtde_lista[indice]
+                        + " g/ml/unidade | "
+                        + menor_preco_lista[indice]
+                    )
+            except Exception:
+                pass
+
+    except HttpError as err:
+        print(err)
+
+
+def gerarMercado(tipo_compra):
+    tipos_cashback = ["Dineirama", "Méliuz"]
+
+    saldo = input("\n" + "Qual o saldo do cartão?" + "\n")
+
+    if tipo_compra == "ofertas":
+        tipo_compra_sorteada = "Ofertas"
+        mercado_definido = definirMercado(tipo_compra_sorteada)
+        print(saldo_vale_alimentacao(saldo))
+        print("\n" + tipo_compra_sorteada)
+        print(mercado_definido + "\n")
+
+    elif tipo_compra == "lanche":
+        tipo_compra_sorteada = "Lanche"
+        mercado_definido = "COM-SCIÊNCIA"
+
+        print(saldo_vale_alimentacao(saldo))
+        print("\n" + tipo_compra_sorteada)
+        print(mercado_definido + "\n")
+
+        acessarPlanilha(ALIMENTOS, mercado_definido, tipo_compra)
+
+    elif saldo_vale_alimentacao(saldo) > 0:
+        tipo_compra_sorteada = definirTipoCompra()
+        mercado_definido = definirMercado(tipo_compra_sorteada)
+        print("\n" + tipo_compra_sorteada)
+
+        print(mercado_definido + "\n")
+
+        if tipo_compra_sorteada != "Lista de compras":
+            if tipo_compra_sorteada == "Cashback":
+                print(aleatorio(tipos_cashback))
+
+            if tipo_compra_sorteada == "Receitas":
+                receitas = db.get_all_activities(
+                    "receitas"
+                )  # Usar get_all_activities para a tabela listas
+                if receitas:  # Verificar se a lista não está vazia
+                    print(aleatorio(receitas))
+                    print("(Programar compra e inserir a refeição na agenda)")
+                else:
+                    print("Nenhuma receita encontrada no banco de dados.")
+            # if tipo_compra_sorteada == "Lanche":
+            #     acessarPlanilha(ALIMENTOS, mercado_definido)
+            if tipo_compra_sorteada == "Essenciais":
+                acessarPlanilha(ESSENCIAIS, mercado_definido, tipo_compra_sorteada)
+        else:
+            planilhas = [ALIMENTOS, CUIDADOS_PESSOAIS, LIMPEZA_UTILIDADES, PET]
+
+            for planilha in planilhas:
+                acessarPlanilha(planilha, mercado_definido, tipo_compra_sorteada)
+    else:
+        tipo_compra_sorteada = "Essenciais"
+        print(saldo_vale_alimentacao(saldo))
+        print("\n" + tipo_compra_sorteada)
+        mercado_definido = definirMercado(tipo_compra_sorteada)
+        print(mercado_definido + "\n")
+        acessarPlanilha(ESSENCIAIS, mercado_definido, tipo_compra_sorteada)

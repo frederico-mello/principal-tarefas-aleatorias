@@ -1,0 +1,34 @@
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Credentials and secrets (NUNCA faça commit destes!)
+credentials.json
+service-account.json
+config.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
