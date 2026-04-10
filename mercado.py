@@ -1,5 +1,4 @@
-import os
-import random
+import secrets
 from calendar import monthrange
 from datetime import datetime
 
@@ -37,8 +36,8 @@ def horario(argumento):
 
 def aleatorio(lista):
     lista.sort()
-    random.shuffle(lista)
-    return random.choice(lista)
+    secrets.shuffle(lista)
+    return secrets.choice(lista)
 
 
 def saldo_vale_alimentacao(saldo):
@@ -250,7 +249,8 @@ def acessarPlanilha(planilha, mercado, tipo_compra):
                         + " g/ml/unidade | "
                         + menor_preco_lista[indice]
                     )
-            except:
+            except (KeyError, ValueError, IndexError):
+                # Silently skip categories with incomplete or invalid data
                 pass
 
     except HttpError as err:

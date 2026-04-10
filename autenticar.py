@@ -8,16 +8,14 @@ Este script facilita o processo de autenticação manual quando há problemas de
 import os
 import sys
 import webbrowser
-from pathlib import Path
 
-from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 # Configurações
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-CLIENT_SECRET_FILE = "G:\\Meu Drive\\Workspace\\aleatorio\\principal-tarefas-aleatorias\\credentials.json"
-TOKEN_FILE = "token.json"
+CLIENT_SECRET_FILE = os.environ.get("GOOGLE_CLIENT_SECRET_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "credentials.json"))
+TOKEN_FILE = os.environ.get("GOOGLE_TOKEN_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "token.json"))
 
 
 def print_header(text):
@@ -30,7 +28,7 @@ def print_header(text):
 def verificar_credenciais():
     """Verifica se o arquivo credentials.json existe"""
     if not os.path.exists(CLIENT_SECRET_FILE):
-        print(f"❌ Arquivo de credenciais não encontrado!")
+        print("❌ Arquivo de credenciais não encontrado!")
         print(f"   Procurado em: {CLIENT_SECRET_FILE}")
         print("\n💡 SOLUÇÃO:")
         print("   1. Acesse: https://console.cloud.google.com/")

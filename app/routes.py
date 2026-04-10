@@ -1,4 +1,4 @@
-import random
+import secrets
 from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request
@@ -15,7 +15,7 @@ def aleatorio(lista):
     """Função auxiliar para sortear um item aleatório de uma lista"""
     if not lista:
         return None
-    return random.choice(lista)
+    return secrets.choice(lista)
 
 
 @bp.route("/")
@@ -154,7 +154,6 @@ def get_atividade_casa():
 
         # Se a atividade for "Ouvir música", chama a rota de música
         if atividade_escolhida.lower() in ["ouvir música", "ouvir musica"]:
-            from flask import url_for
 
             musica_response = get_musica()
             return musica_response
@@ -182,7 +181,7 @@ def get_atividade_casa():
             redes_sociais = redes_sociais_unesp + redes_sociais_casa
 
             if redes_sociais:
-                rede_escolhida = random.choice(redes_sociais)
+                rede_escolhida = secrets.choice(redes_sociais)
                 db.registrar_item_sorteado(rede_escolhida, "redes_sociais")
                 return jsonify(
                     {

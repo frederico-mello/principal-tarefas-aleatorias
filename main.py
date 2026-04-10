@@ -1,4 +1,5 @@
 import random
+import secrets
 from calendar import monthrange
 from datetime import datetime, time
 
@@ -56,7 +57,7 @@ def saldo_vale_alimentacao(saldo):
 
 
 def aleatorio(lista):
-    return random.choice(lista)
+    return secrets.choice(lista)
 
 
 def gerar_amigos():
@@ -83,8 +84,6 @@ def gerar_musica():
 
 
 def gerarCasa(tempo_disponivel):
-    global shown_activities
-
     # Carregar atividades do banco de dados
     atividades_casa = db.get_all_items("atividades_casa")
     # Excluir exercícios físicos entre 7h e 17h
@@ -94,9 +93,6 @@ def gerarCasa(tempo_disponivel):
 
     # Obter os últimos 10 itens sorteados para evitar repetição
     historico_recente = db.obter_historico_sorteios(2)
-    itens_recentes = (
-        [item[0] for item in historico_recente] if historico_recente else []
-    )
 
     # Lógica de seleção de atividades revisada para evitar repetições
 
@@ -239,7 +235,6 @@ def gerarCasa(tempo_disponivel):
 
 
 def gerarComida(valor_maximo=None):
-    global novoSorteado
     if not novoSorteado:
         if valor_maximo is not None:
             item, valor = db.get_random_item("almoco", valor_maximo)
@@ -253,7 +248,6 @@ def gerarComida(valor_maximo=None):
 
 
 def gerarEntretenimento():
-    global novoSorteado
     if novoSorteado:
         message = f"Você já escolheu: {novoSorteado[0]}"
         print(f"\n{message}")
@@ -307,13 +301,12 @@ def gerarCompras():
 
 
 def gerarRefeicao():
-    global novoSorteado
     if not novoSorteado:
         itens_refeicao = db.get_all_items("refeicao")
         if not itens_refeicao:
             print("\nNenhum item de refeição encontrado no banco de dados.")
             return "Erro: Nenhum item de refeição cadastrado."
-        item = random.choice(list(itens_refeicao.keys()))
+        item = secrets.choice(list(itens_refeicao.keys()))
         print(f"\nVocê pode comer: {item}")
         db.registrar_item_sorteado(item, "refeicao")
         novoSorteado.append(item)
@@ -324,13 +317,9 @@ def gerarRefeicao():
 
 
 def gerarTarefasUnesp():
-    global listaUnesp, shown_activities
 
     # Obter os últimos 10 itens sorteados para evitar repetição
     historico_recente = db.obter_historico_sorteios(10)
-    itens_recentes = (
-        [item[0] for item in historico_recente] if historico_recente else []
-    )
 
     # Carregar e combinar as listas de atividades
     listaUnesp = []
@@ -388,21 +377,21 @@ def gerarTarefasUnesp():
     elif atividade_escolhida == "Interagir nas redes sociais":
         redes_sociais = db.get_all_activities("redes_sociais_unesp")
         if redes_sociais:
-            rede_escolhida = random.choice(redes_sociais)
+            rede_escolhida = secrets.choice(redes_sociais)
             tarefa_final = f"{atividade_escolhida}: {rede_escolhida}"
             shown_activities.add(tarefa_final)
             return tarefa_final
     elif atividade_escolhida == "Estudar sobre o mercado financeiro":
         topicos_financeiros = db.get_all_activities("financas")
         if topicos_financeiros:
-            topico_escolhido = random.choice(topicos_financeiros)
+            topico_escolhido = secrets.choice(topicos_financeiros)
             shown_activities.add(topico_escolhido)
             db.registrar_item_sorteado(topico_escolhido, "financas")
             return topico_escolhido
     elif atividade_escolhida == "Atualizar playlist de música":
         itens_multimidia = db.get_all_activities("multimidia")
         if itens_multimidia:
-            item_escolhido = random.choice(itens_multimidia)
+            item_escolhido = secrets.choice(itens_multimidia)
             tarefa_final = f"{atividade_escolhida}: {item_escolhido}"
             shown_activities.add(tarefa_final)
             db.registrar_item_sorteado(atividade_escolhida, "multimidia")
@@ -448,9 +437,6 @@ def gerar_estudos():
 
     # Obter histórico recente
     historico_recente = db.obter_historico_sorteios(20)
-    itens_recentes = (
-        [item[0] for item in historico_recente] if historico_recente else []
-    )
 
     # Garantir que "Estudar sobre o mercado financeiro" não seja tratado aqui
     estudos_disponiveis = [
@@ -467,9 +453,9 @@ def gerar_estudos():
 
     # Escolher um estudo
     estudo_sorteado = (
-        random.choice(estudos_nao_recentes)
+        secrets.choice(estudos_nao_recentes)
         if estudos_nao_recentes
-        else random.choice(estudos_disponiveis)
+        else secrets.choice(estudos_disponiveis)
     )
 
     # Lógica para outros tipos de estudos
@@ -489,9 +475,6 @@ def gerarExercicios():
 
     # Obter histórico recente de exercícios
     historico_recente = db.obter_historico_sorteios(10)
-    itens_recentes = (
-        [item[0] for item in historico_recente] if historico_recente else []
-    )
 
     exercicio_fisico = db.get_random_activity("exercicios_fisicos")
 
@@ -553,7 +536,7 @@ def gerar_redes_sociais():
     else:  # Horário da UNESP
         redes = db.get_all_activities("redes_sociais_unesp")
 
-    return random.choice(redes) if redes else "Nenhuma rede social disponível"
+    return secrets.choice(redes) if redes else "Nenhuma rede social disponível"
 
 
 def ver_historico():

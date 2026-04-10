@@ -1,7 +1,5 @@
 import sqlite3
 from pathlib import Path
-from datetime import datetime
-import os
 
 class Database:
     def __init__(self, db_name='listas.db'):
@@ -9,13 +7,13 @@ class Database:
         project_root = Path(__file__).parent.parent
         self.db_path = project_root / db_name
         
-        print(f"--- [Database Init] ---")
+        print("--- [Database Init] ---")
         print(f"Procurando banco de dados em: {self.db_path.resolve()}")
         if self.db_path.exists():
             print("Banco de dados encontrado!")
         else:
             print("AVISO: Banco de dados NÃO encontrado. Um novo será criado, mas pode estar vazio.")
-        print(f"----------------------")
+        print("----------------------")
 
         self._create_tables()
     
